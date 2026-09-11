@@ -7,34 +7,32 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * Task Entity - represents a single task/todo item.
+ * Project Entity - represents a project that groups tasks together.
  */
 @Entity
-@Table(name = "tasks")
+@Table(name = "projects")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Task {
+public class Project {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private String title;
+    private String name;
 
     @Column(length = 500)
     private String description;
 
-    // Status: TODO, IN_PROGRESS, DONE
+    // Status: ACTIVE, ON_HOLD, COMPLETED
     @Column(nullable = false)
-    private String status = "TODO";
+    private String status = "ACTIVE";
 
     // Priority: LOW, MEDIUM, HIGH
     @Column(nullable = false)
     private String priority = "MEDIUM";
-
-    private boolean completed = false;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
