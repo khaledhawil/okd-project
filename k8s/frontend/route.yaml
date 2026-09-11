@@ -1,0 +1,14 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: task-frontend-route
+spec:
+  # The service we are exposing to the public internet
+  to:
+    kind: Service
+    name: task-frontend
+  # The port on the service to route traffic to
+  port:
+    targetPort: 80
+  # We leave 'host' blank so OKD automatically generates a URL like:
+  # http://task-frontend-route-my-namespace.apps.mycluster.com

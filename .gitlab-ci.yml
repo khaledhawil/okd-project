@@ -1,0 +1,150 @@
+# Define the stages of our pipeline
+stages:
+  - build
+  - test
+  - sonar
+  - docker
+  - deploy
+
+# Global variables
+variables:
+  # Use Docker BuildKit for faster builds
+  DOCKER_BUILDKIT: 1
+  # These variables should be set in GitLab CI/CD Settings -> Variables:
+  # SONAR_TOKEN, SONAR_HOST_URL, OKD_SERVER, OKD_TOKEN, OKD_NAMESPACE
+
+# ==========================================
+# 1. BUILD STAGE
+# ==========================================
+build_backend:
+  stage: build
+  image: maven:3.9.6-eclipse-temurin-17
+  script:
+    - cd backend
+    - mvn clean compile
+  artifacts:
+    paths:
+      - backend/target/
+  # Cache maven dependencies to speed up future builds
+  cache:
+    key: maven-cache
+    paths:
+      - .m2/repository
+
+build_frontend:
+  stage: build
+  image: node:18-alpine
+  script:
+    - cd frontend
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist/
+
+# ==========================================
+# 2. TEST STAGE
+# ==========================================
+test_backend:
+  stage: test
+  image: maven:3.9.6-eclipse-temurin-17
+  script:
+    - cd backend
+    - mvn test
+  artifacts:
+    # We need the Jacoco report for SonarQube in the next stage
+    paths:
+      - backend/target/site/jacoco/jacoco.xml
+      - backend/target/surefire-reports/
+
+# ==========================================
+# 3. SONARQUBE STAGE
+# ==========================================
+sonar_backend:
+  stage: sonar
+  image: sonarsource/sonar-scanner-cli:latest
+  dependencies:
+    - build_backend
+    - test_backend
+  script:
+    - cd backend
+    - sonar-scanner
+  allow_failure: true # Don't block the pipeline if Sonar fails initially
+
+sonar_frontend:
+  stage: sonar
+  image: sonarsource/sonar-scanner-cli:latest
+  dependencies:
+    - build_frontend
+  script:
+    - cd frontend
+    - sonar-scanner
+  allow_failure: true
+
+# ==========================================
+# 4. DOCKER STAGE (Build & Push)
+# ==========================================
+# We use Docker-in-Docker (dind) to build container images
+.docker_base:
+  stage: docker
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  before_script:
+    # Log in to the GitLab Container Registry
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+docker_build_backend:
+  extends: .docker_base
+  script:
+    - cd backend
+    - docker build -t $CI_REGISTRY_IMAGE/backend:latest .
+    - docker push $CI_REGISTRY_IMAGE/backend:latest
+
+docker_build_frontend:
+  extends: .docker_base
+  script:
+    - cd frontend
+    - docker build -t $CI_REGISTRY_IMAGE/frontend:latest .
+    - docker push $CI_REGISTRY_IMAGE/frontend:latest
+
+# ==========================================
+# 5. DEPLOY STAGE (OKD / OpenShift)
+# ==========================================
+deploy_okd:
+  stage: deploy
+  # Use an image that has the OpenShift 'oc' CLI tool installed
+  image: bitnami/kubectl:latest
+  script:
+    # 1. Login to OKD cluster (requires OKD_SERVER and OKD_TOKEN variables)
+    # Note: Using kubectl as a stand-in since bitnami/kubectl doesn't have 'oc'. 
+    # For actual 'oc login', an openshift-cli image like 'quay.io/openshift/origin-cli' is better,
+    # but kubectl works fine for applying standard Kubernetes manifests to OKD.
+    - kubectl config set-cluster okd --server="$OKD_SERVER" --insecure-skip-tls-verify=true
+    - kubectl config set-credentials gitlab --token="$OKD_TOKEN"
+    - kubectl config set-context okd-context --cluster=okd --user=gitlab --namespace="$OKD_NAMESPACE"
+    - kubectl config use-context okd-context
+
+    # 2. Update the image URLs in the deployment files to point to our GitLab registry
+    # (We use sed to replace $CI_REGISTRY_IMAGE with the actual variable value)
+    - sed -i "s|\$CI_REGISTRY_IMAGE|$CI_REGISTRY_IMAGE|g" k8s/backend/deployment.yaml
+    - sed -i "s|\$CI_REGISTRY_IMAGE|$CI_REGISTRY_IMAGE|g" k8s/frontend/deployment.yaml
+
+    # 3. Apply the Database manifests
+    - kubectl apply -f k8s/postgres/secret.yaml
+    - kubectl apply -f k8s/postgres/deployment.yaml
+    - kubectl apply -f k8s/postgres/service.yaml
+
+    # 4. Apply Backend manifests
+    - kubectl apply -f k8s/backend/deployment.yaml
+    - kubectl apply -f k8s/backend/service.yaml
+
+    # 5. Apply Frontend manifests
+    - kubectl apply -f k8s/frontend/deployment.yaml
+    - kubectl apply -f k8s/frontend/service.yaml
+    - kubectl apply -f k8s/frontend/route.yaml
+  environment:
+    name: production
+  # Only deploy when pushing to the main branch
+  only:
+    - main

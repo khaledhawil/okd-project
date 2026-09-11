@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-frontend
+  labels:
+    app: task-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: task-frontend
+  template:
+    metadata:
+      labels:
+        app: task-frontend
+    spec:
+      containers:
+        - name: frontend
+          # This image will be built and pushed by GitLab CI
+          image: $CI_REGISTRY_IMAGE/frontend:latest
+          ports:
+            - containerPort: 80

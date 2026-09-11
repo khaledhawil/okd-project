@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-backend
+  labels:
+    app: task-backend
+spec:
+  replicas: 2 # Run 2 instances for High Availability
+  selector:
+    matchLabels:
+      app: task-backend
+  template:
+    metadata:
+      labels:
+        app: task-backend
+    spec:
+      containers:
+        - name: backend
+          # This image will be built and pushed by GitLab CI
+          image: $CI_REGISTRY_IMAGE/backend:latest
+          ports:
+            - containerPort: 8080
+          env:
+            # We point the DB_HOST to the name of our postgres Kubernetes Service
+            - name: DB_HOST
+              value: postgres
+            - name: DB_NAME
+              value: taskdb
+            # Pull DB credentials from the same secret so it matches
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: database-user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: database-password
