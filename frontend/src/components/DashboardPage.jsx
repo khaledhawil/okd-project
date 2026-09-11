@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const BASE_URL = `http://${window.location.hostname}:8080/api`;
+const BASE_URL = `http://${window.location.hostname}:8081/api`;
 
 export default function DashboardPage() {
   const [tasks, setTasks] = useState([]);
