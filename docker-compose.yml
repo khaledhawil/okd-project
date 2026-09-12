@@ -1,8 +1,5 @@
 version: '3.8'
 
-# This file is for local testing before pushing to GitLab/OKD.
-# Run 'docker-compose up --build' in this directory to start the whole stack.
-
 services:
   # 1. Database Service
   postgres:
@@ -16,34 +13,48 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # 2. Java Backend Service
+  # 2. Auth Service (Login / Signup / JWT)
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: taskdb
+      DB_USER: devops_user
+      DB_PASSWORD: devops_password
+      JWT_SECRET: mySecretKey123456789012345678901234
+    depends_on:
+      - postgres
+
+  # 3. Java Backend Service (Tasks / Projects API)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8081:8080" # External port 8081 → container port 8080 (8080 was already in use)
+      - "8081:8080"
     environment:
-      # These variables override the default ones in application.yml
       DB_HOST: postgres
       DB_NAME: taskdb
       DB_USER: devops_user
       DB_PASSWORD: devops_password
+      JWT_SECRET: mySecretKey123456789012345678901234
     depends_on:
-      - postgres # Wait for postgres container to start before starting backend
+      - postgres
 
-  # 3. React Frontend Service
+  # 4. React Frontend Service
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80" # Map container port 80 (nginx) to local port 3000
-    # Note: The React app automatically detects the backend URL using the browser's
-    # hostname (e.g., http://192.168.1.222:8080/api/tasks). No env var needed.
+      - "3000:80"
     depends_on:
       - backend
+      - auth-service
 
-# Named volume to persist database data even if the container is deleted
 volumes:
   postgres_data:

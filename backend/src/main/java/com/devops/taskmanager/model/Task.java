@@ -6,16 +6,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
-/**
- * Task Entity - represents a single task/todo item.
- */
 @Entity
 @Table(name = "tasks")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Task {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -26,15 +22,16 @@ public class Task {
     @Column(length = 500)
     private String description;
 
-    // Status: TODO, IN_PROGRESS, DONE
     @Column(nullable = false)
     private String status = "TODO";
 
-    // Priority: LOW, MEDIUM, HIGH
     @Column(nullable = false)
     private String priority = "MEDIUM";
 
     private boolean completed = false;
+
+    @Column(name = "user_id")
+    private Long userId;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

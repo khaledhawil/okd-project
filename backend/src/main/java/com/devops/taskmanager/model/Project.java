@@ -6,16 +6,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
-/**
- * Project Entity - represents a project that groups tasks together.
- */
 @Entity
 @Table(name = "projects")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Project {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -26,13 +22,14 @@ public class Project {
     @Column(length = 500)
     private String description;
 
-    // Status: ACTIVE, ON_HOLD, COMPLETED
     @Column(nullable = false)
     private String status = "ACTIVE";
 
-    // Priority: LOW, MEDIUM, HIGH
     @Column(nullable = false)
     private String priority = "MEDIUM";
+
+    @Column(name = "user_id")
+    private Long userId;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
